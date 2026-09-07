@@ -273,7 +273,8 @@ pub async fn admin_dashboard(State(_pool): State<SqlitePool>) -> impl IntoRespon
 pub async fn list_admin_comments(State(pool): State<SqlitePool>) -> impl IntoResponse {
     let comments: Vec<Comment> = sqlx::query_as!(
         Comment,
-        "SELECT id, post_slug, author_name, author_email, content, is_approved, created_at FROM comments ORDER BY created_at DESC LIMIT 100"
+        // 🌟 FIX: Added parent_id to the SELECT statement
+        "SELECT id, post_slug, author_name, author_email, content, is_approved, created_at, parent_id FROM comments ORDER BY created_at DESC LIMIT 100"
     ).fetch_all(&pool).await.unwrap_or_default();
 
     if comments.is_empty() {
@@ -289,9 +290,17 @@ pub async fn list_admin_comments(State(pool): State<SqlitePool>) -> impl IntoRes
 
 pub async fn toggle_approve_comment(State(pool): State<SqlitePool>, Path(id): Path<String>) -> impl IntoResponse {
     let _ = sqlx::query!("UPDATE comments SET is_approved = NOT is_approved WHERE id = ?", id).execute(&pool).await;
-    if let Ok(comment) = sqlx::query_as!(Comment, "SELECT * FROM comments WHERE id = ?", id).fetch_one(&pool).await {
+    
+    // 🌟 FIX: Explicitly select all columns including parent_id instead of using SELECT *
+    if let Ok(comment) = sqlx::query_as!(
+        Comment, 
+        "SELECT id, post_slug, author_name, author_email, content, is_approved, created_at, parent_id FROM comments WHERE id = ?", 
+        id
+    ).fetch_one(&pool).await {
         Html(render_admin_row(&comment))
-    } else { Html("".to_string()) }
+    } else { 
+        Html("".to_string()) 
+    }
 }
 
 pub async fn delete_comment(State(pool): State<SqlitePool>, Path(id): Path<String>) -> impl IntoResponse {
@@ -428,11 +437,10 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
     container.innerHTML = `
         <div class="mr-container">
             <h3 class="mr-title">Discussion</h3>
-            <div id="mr-list" style="margin-bottom: 2rem;"><p style="color: var(--mr-muted); font-size: 0.875rem;">Loading comments...</p></div>
             
-            <div id="mr-master-slot">
+            <!-- 🌟 MOVED: The Master Slot (Form) is now ABOVE the comments list -->
+            <div id="mr-master-slot" style="margin-bottom: 2rem;">
                 <form id="mr-form" style="max-width: 36rem;">
-                    <!-- 🌟 NEW: Hidden inputs for threading -->
                     <input type="hidden" id="mr-slug" value="${postSlug}">
                     <input type="hidden" id="mr-parent-id" value="">
                     <input type="text" id="mr-honeypot" style="display:none" tabindex="-1" autocomplete="off">
@@ -443,21 +451,27 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
 
                     <div class="mr-grid">
                         <div>
+                            <!-- 🌟 INCLUDED: Updated labels for theme compatibility -->
                             <label class="mr-label">Name *</label>
                             <input type="text" id="mr-name" required class="mr-input" placeholder="Jane Doe">
                         </div>
                         <div>
-                            <label style="font-size: 0.75rem; font-weight: 600;">Email (Optional)</label>
+                            <label class="mr-label">Email (Optional)</label>
                             <input type="email" id="mr-email" class="mr-input" placeholder="jane@example.com">
                         </div>
                     </div>
                     <div style="margin-bottom: 1rem;">
-                        <label style="font-size: 0.75rem; font-weight: 600;">Comment *</label>
+                        <label class="mr-label">Comment *</label>
                         <textarea id="mr-content" rows="3" required class="mr-input" placeholder="Write a comment..."></textarea>
                     </div>
                     <div id="mr-status" style="margin-bottom: 1rem;"></div>
                     <button type="submit" class="mr-btn" id="mr-submit">Post Comment</button>
                 </form>
+            </div>
+
+            <!-- 🌟 MOVED: The Comments List is now BELOW the form -->
+            <div id="mr-list">
+                <p style="color: var(--mr-muted); font-size: 0.875rem;">Loading comments...</p>
             </div>
         </div>
     `;
@@ -469,7 +483,6 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
     const parentInput = document.getElementById("mr-parent-id");
     const replyIndicator = document.getElementById("mr-replying-to");
 
-    // 🌟 NEW: Handle moving the form when "Reply" is clicked
     window.mrReplyTo = function(commentId) {
         parentInput.value = commentId;
         replyIndicator.style.display = "block";
@@ -504,7 +517,6 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
         formData.append("content", document.getElementById("mr-content").value);
         formData.append("honeypot", document.getElementById("mr-honeypot").value);
         
-        // 🌟 NEW: Attach parent ID if it exists
         if (parentInput.value) {
             formData.append("parent_id", parentInput.value);
         }
@@ -514,7 +526,6 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
             statusEl.innerHTML = await res.text();
             if (res.ok) {
                 formEl.reset();
-                // Reset form position after successful submission
                 parentInput.value = "";
                 replyIndicator.style.display = "none";
                 masterSlot.appendChild(formEl);
