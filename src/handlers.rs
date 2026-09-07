@@ -275,7 +275,8 @@ pub async fn admin_dashboard(State(_pool): State<SqlitePool>) -> impl IntoRespon
         <script src=\"https://unpkg.com/htmx.org@1.9.12\"></script>\
     </head>\
     <body class=\"bg-neutral-950 text-neutral-100 min-h-screen font-sans p-6\">\
-        <div class=\"max-w-6xl mx-auto space-y-6\">\
+        <!-- 🌟 CHANGED: max-w-6xl is now max-w-7xl below -->\
+        <div class=\"max-w-7xl mx-auto space-y-6\">\
             <header class=\"flex items-center justify-between border-b border-neutral-800 pb-4\">\
                 <div>\
                     <h1 class=\"text-2xl font-bold text-emerald-400\">Comment Moderation</h1>\
@@ -360,22 +361,27 @@ fn render_admin_row(c: &Comment) -> String {
         "<span class=\"inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-950 text-amber-400 border border-amber-800\">Pending</span>"
     };
 
-    // 🌟 NEW: Check if the comment has a parent_id to label it as a Reply or Top-Level
+    // 🌟 FIX: Removed ml-2 margin hack, we will use Flexbox gap instead
     let type_badge = if c.parent_id.is_some() {
-        "<span class=\"ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-950 text-indigo-400 border border-indigo-800\">Reply</span>"
+        "<span class=\"inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-950 text-indigo-400 border border-indigo-800\">Reply</span>"
     } else {
-        "<span class=\"ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700\">Top-Level</span>"
+        "<span class=\"inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700\">Top-Level</span>"
     };
 
     let toggle_label = if c.is_approved { "Unapprove" } else { "Approve" };
 
     format!(
         "<tr id=\"comment-row-{id}\" class=\"hover:bg-neutral-800/40 transition-colors\">\
-            <td class=\"px-4 py-3 whitespace-nowrap\">{badge}{type_badge}</td>\
-            <td class=\"px-4 py-3 font-mono text-xs text-neutral-300\">{slug}</td>\
-            <td class=\"px-4 py-3\">\
-                <div class=\"font-bold text-neutral-200\">{author}</div>\
-                <div class=\"text-xs text-neutral-500\">{email}</div>\
+            <td class=\"px-4 py-3 whitespace-nowrap\">\
+                <div class=\"flex items-center gap-2\">\
+                    {badge}\
+                    {type_badge}\
+                </div>\
+            </td>\
+            <td class=\"px-4 py-3 font-mono text-xs text-neutral-300 max-w-[12rem] truncate\" title=\"{slug}\">{slug}</td>\
+            <td class=\"px-4 py-3 max-w-[12rem]\">\
+                <div class=\"font-bold text-neutral-200 truncate\" title=\"{author}\">{author}</div>\
+                <div class=\"text-xs text-neutral-500 truncate\" title=\"{email}\">{email}</div>\
             </td>\
             <td class=\"px-4 py-3 text-neutral-300 max-w-md truncate\">{content}</td>\
             <td class=\"px-4 py-3 text-xs text-neutral-400 whitespace-nowrap\">{date}</td>\
@@ -386,7 +392,7 @@ fn render_admin_row(c: &Comment) -> String {
         </tr>",
         id = c.id, 
         badge = status_badge, 
-        type_badge = type_badge, // 🌟 INJECTED: Added the new badge variable here
+        type_badge = type_badge,
         slug = c.post_slug, 
         author = c.author_name,
         email = c.author_email.as_deref().unwrap_or("-"), 
@@ -408,18 +414,16 @@ pub async fn serve_css() -> impl axum::response::IntoResponse {
         --mr-muted: #737373; 
     }
 
-    /* 🌟 Dark Mode (System Preference) */
     @media (prefers-color-scheme: dark) {
         :root:not(.light) {
-            --mr-bg: #171717; /* Neutral 900 */
-            --mr-input-bg: #262626; /* Neutral 800 */
-            --mr-border: #404040; /* Neutral 700 */
-            --mr-text: #f5f5f5; /* Neutral 100 */
-            --mr-muted: #a3a3a3; /* Neutral 400 */
+            --mr-bg: #171717;
+            --mr-input-bg: #262626;
+            --mr-border: #404040;
+            --mr-text: #f5f5f5;
+            --mr-muted: #a3a3a3;
         }
     }
 
-    /* 🌟 Dark Mode (Manual Class Toggle for Astro/Tailwind) */
     html.dark, .dark {
         --mr-bg: #171717;
         --mr-input-bg: #262626;
@@ -428,11 +432,15 @@ pub async fn serve_css() -> impl axum::response::IntoResponse {
         --mr-muted: #a3a3a3;
     }
 
+    /* 🌟 THE FIX: This stops inputs from overlapping their grid! */
+    .mr-container, .mr-container * {
+        box-sizing: border-box;
+    }
+
     /* Widget Styles */
     .mr-container { font-family: system-ui, sans-serif; color: var(--mr-text); margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--mr-border); }
     .mr-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 1.5rem; color: var(--mr-text); }
     
-    /* 🌟 FIX: Inputs now use --mr-input-bg and explicitly set color so text is readable */
     .mr-input { 
         width: 100%; 
         padding: 0.5rem 0.75rem; 
@@ -447,7 +455,6 @@ pub async fn serve_css() -> impl axum::response::IntoResponse {
     .mr-input::placeholder { color: var(--mr-muted); opacity: 0.7; }
     .mr-input:focus { outline: none; border-color: var(--mr-primary); box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2); }
     
-    /* Labels */
     .mr-label { font-size: 0.75rem; font-weight: 600; color: var(--mr-text); }
     
     .mr-btn { background: var(--mr-primary); color: white; padding: 0.5rem 1.25rem; border-radius: 0.5rem; border: none; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
@@ -520,7 +527,7 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
                     </div>
                     <div style="margin-bottom: 1rem;">
                         <label class="mr-label">Comment *</label>
-                        <textarea id="mr-content" rows="3" required class="mr-input" placeholder="Write a comment..."></textarea>
+                        <textarea id="mr-content" rows="2" required class="mr-input" placeholder="Write a comment..." style="resize: vertical; min-height: 60px; max-height: 250px;"></textarea>
                     </div>
                     <!-- 🌟 FIX: Wrapped in a flex container to push the button right -->
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
