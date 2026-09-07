@@ -1,0 +1,33 @@
+name: Publish Docker
+on:
+  push:
+    branches: [ "main" ]
+    # Add these filters to skip documentation-only changes
+    #paths-ignore:
+    #  - 'README.md'
+    #  - '**.txt'
+    #  - '**.md'
+    #  - 'docs/**'
+    #  - '.gitignore'
+    #  - '.dockerignore'
+    #  - 'LICENSE'
+jobs:
+  github-repo:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    - name: Publish to Registry
+      uses: elgohr/Publish-Docker-Github-Action@v5
+      with:
+        name: rajasekhar-gundala/comment-service
+        username: ${{ github.actor }}
+        password: ${{ secrets.PERSONAL_TOKEN }}
+        registry: ghcr.io
+        dockerfile: Dockerfile
+        buildoptions: "--compress --force-rm"
+        tags: "latest"

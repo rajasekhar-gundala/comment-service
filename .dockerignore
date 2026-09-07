@@ -1,0 +1,10 @@
+target/
+.git/
+.env
+comments.db
+comments.db-shm
+comments.db-wal
+build.db
+build.db-shm
+build.db-wal
+sqlx-data.json
