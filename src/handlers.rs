@@ -20,8 +20,8 @@ pub async fn get_comments(
 ) -> impl IntoResponse {
     let comments: Vec<Comment> = sqlx::query_as!(
         Comment,
-        // 🌟 FIX: Include parent_id in the SELECT query
-        "SELECT id, post_slug, author_name, author_email, content, is_approved, created_at, parent_id FROM comments WHERE post_slug = ? AND is_approved = 1 ORDER BY created_at ASC",
+        // 🌟 FIX: Changed ASC to DESC at the end of the query
+        "SELECT id, post_slug, author_name, author_email, content, is_approved, created_at, parent_id FROM comments WHERE post_slug = ? AND is_approved = 1 ORDER BY created_at DESC",
         query.slug
     )
     .fetch_all(&pool)
