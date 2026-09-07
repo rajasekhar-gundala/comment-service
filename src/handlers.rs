@@ -360,7 +360,6 @@ fn render_admin_row(c: &Comment) -> String {
         "<span class=\"inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-950 text-amber-400 border border-amber-800\">Pending</span>"
     };
 
-    // 🌟 FIX: Removed ml-2 margin hack, we will use Flexbox gap instead
     let type_badge = if c.parent_id.is_some() {
         "<span class=\"inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-950 text-indigo-400 border border-indigo-800\">Reply</span>"
     } else {
@@ -382,7 +381,10 @@ fn render_admin_row(c: &Comment) -> String {
                 <div class=\"font-bold text-neutral-200 truncate\" title=\"{author}\">{author}</div>\
                 <div class=\"text-xs text-neutral-500 truncate\" title=\"{email}\">{email}</div>\
             </td>\
-            <td class=\"px-4 py-3 text-neutral-300 max-w-md truncate\">{content}</td>\
+            <!-- 🌟 FIX: Replaced 'truncate' with 'line-clamp-2' and 'whitespace-normal' in a wrapper div -->\
+            <td class=\"px-4 py-3 text-neutral-300 max-w-xs xl:max-w-md\">\
+                <div class=\"line-clamp-2 whitespace-normal break-words\">{content}</div>\
+            </td>\
             <td class=\"px-4 py-3 text-xs text-neutral-400 whitespace-nowrap\">{date}</td>\
             <td class=\"px-4 py-3 text-right space-x-2 whitespace-nowrap\">\
                 <button hx-post=\"/admin/api/comments/{id}/toggle\" hx-target=\"#comment-row-{id}\" hx-swap=\"outerHTML\" class=\"px-2.5 py-1 text-xs font-semibold bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded border border-neutral-700 transition-colors\">{toggle}</button>\
