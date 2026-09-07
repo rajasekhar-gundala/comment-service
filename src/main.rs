@@ -43,6 +43,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/admin/logout", get(handlers::admin_logout));
 
     let app = Router::new()
+        .route("/widget.js", get(handlers::serve_js))
+        .route("/widget.css", get(handlers::serve_css))
         .route("/api/comments", get(handlers::get_comments))
         .route("/api/comments", post(handlers::post_comment))
         .merge(public_admin_routes)

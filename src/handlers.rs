@@ -315,3 +315,120 @@ fn render_admin_row(c: &Comment) -> String {
         date = c.created_at.format("%Y-%m-%d %H:%M"), toggle = toggle_label
     )
 }
+
+pub async fn serve_css() -> impl axum::response::IntoResponse {
+    let css = r###"
+    :root {
+        --mr-primary: #059669; /* Emerald 600 */
+        --mr-bg: #f9fafb;
+        --mr-border: #e5e7eb;
+        --mr-text: #171717;
+        --mr-muted: #737373;
+    }
+    .mr-container { font-family: system-ui, sans-serif; color: var(--mr-text); margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--mr-border); }
+    .mr-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 1.5rem; }
+    .mr-input { width: 100%; padding: 0.5rem 0.75rem; border: 1px solid var(--mr-border); border-radius: 0.5rem; background: var(--mr-bg); margin-top: 0.25rem; font-family: inherit; }
+    .mr-btn { background: var(--mr-primary); color: white; padding: 0.5rem 1.25rem; border-radius: 0.5rem; border: none; font-weight: bold; cursor: pointer; }
+    .mr-btn:hover { opacity: 0.9; }
+    .mr-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }
+    @media (min-width: 640px) { .mr-grid { grid-template-columns: 1fr 1fr; } }
+    .comment-item { padding: 1rem; background: var(--mr-bg); border: 1px solid var(--mr-border); border-radius: 0.5rem; margin-bottom: 1rem; }
+    .comment-header { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
+    .comment-author { font-weight: bold; }
+    .comment-date { font-size: 0.75rem; color: var(--mr-muted); }
+    .comment-content { font-size: 0.875rem; line-height: 1.5; }
+    .comment-success-msg { padding: 1rem; background-color: #ecfdf5; border: 1px solid #a7f3d0; color: #065f46; border-radius: 0.5rem; font-size: 0.875rem; }
+    "###;
+    (axum::http::StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")], css).into_response()
+}
+
+pub async fn serve_js() -> impl axum::response::IntoResponse {
+    let js = r###"
+(function() {
+    const scriptTag = document.currentScript;
+    const backendOrigin = new URL(scriptTag ? scriptTag.src : window.location.href).origin;
+    
+    // Look for the container and its data-slug attribute
+    const container = document.getElementById("markreply-comments");
+    if (!container) return;
+    
+    const postSlug = container.getAttribute("data-slug") || window.location.pathname;
+
+    // Inject CSS
+    if (!document.querySelector(`link[href="${backendOrigin}/widget.css"]`)) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = `${backendOrigin}/widget.css`;
+        document.head.appendChild(link);
+    }
+
+    container.innerHTML = `
+        <div class="mr-container">
+            <h3 class="mr-title">Discussion</h3>
+            <div id="mr-list" style="margin-bottom: 2rem;"><p style="color: var(--mr-muted); font-size: 0.875rem;">Loading comments...</p></div>
+            
+            <form id="mr-form" style="max-width: 36rem;">
+                <input type="hidden" id="mr-slug" value="${postSlug}">
+                <input type="text" id="mr-honeypot" style="display:none" tabindex="-1" autocomplete="off">
+                
+                <div class="mr-grid">
+                    <div>
+                        <label style="font-size: 0.75rem; font-weight: 600;">Name *</label>
+                        <input type="text" id="mr-name" required class="mr-input" placeholder="Jane Doe">
+                    </div>
+                    <div>
+                        <label style="font-size: 0.75rem; font-weight: 600;">Email (Optional)</label>
+                        <input type="email" id="mr-email" class="mr-input" placeholder="jane@example.com">
+                    </div>
+                </div>
+                <div style="margin-bottom: 1rem;">
+                    <label style="font-size: 0.75rem; font-weight: 600;">Comment *</label>
+                    <textarea id="mr-content" rows="3" required class="mr-input" placeholder="Write a comment..."></textarea>
+                </div>
+                <div id="mr-status" style="margin-bottom: 1rem;"></div>
+                <button type="submit" class="mr-btn" id="mr-submit">Post Comment</button>
+            </form>
+        </div>
+    `;
+
+    const listEl = document.getElementById("mr-list");
+    const formEl = document.getElementById("mr-form");
+    const statusEl = document.getElementById("mr-status");
+
+    async function fetchComments() {
+        try {
+            const res = await fetch(`${backendOrigin}/api/comments?slug=${encodeURIComponent(postSlug)}`);
+            listEl.innerHTML = await res.text();
+        } catch (err) {
+            listEl.innerHTML = '<p>Could not load comments.</p>';
+        }
+    }
+
+    formEl.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        document.getElementById("mr-submit").disabled = true;
+        
+        const formData = new URLSearchParams();
+        formData.append("post_slug", postSlug);
+        formData.append("author_name", document.getElementById("mr-name").value);
+        formData.append("author_email", document.getElementById("mr-email").value);
+        formData.append("content", document.getElementById("mr-content").value);
+        formData.append("honeypot", document.getElementById("mr-honeypot").value);
+
+        try {
+            const res = await fetch(`${backendOrigin}/api/comments`, { method: "POST", body: formData });
+            statusEl.innerHTML = await res.text();
+            if (res.ok) {
+                formEl.reset();
+                fetchComments();
+            }
+        } finally {
+            document.getElementById("mr-submit").disabled = false;
+        }
+    });
+
+    fetchComments();
+})();
+    "###;
+    (axum::http::StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "application/javascript; charset=utf-8")], js).into_response()
+}
