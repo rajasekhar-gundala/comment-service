@@ -63,6 +63,7 @@ pub async fn post_comment(
     State(pool): State<SqlitePool>,
     Form(payload): Form<CreateCommentForm>,
 ) -> impl IntoResponse {
+    // 1. Spam Trap Check
     if let Some(bot_trap) = payload.honeypot {
         if !bot_trap.trim().is_empty() {
             return (StatusCode::OK, Html(String::new())).into_response();
@@ -71,16 +72,37 @@ pub async fn post_comment(
 
     let clean_author = ammonia::clean(&payload.author_name);
     let clean_content = ammonia::clean(&payload.content);
-    let id = Uuid::new_v4().to_string();
+    let id = uuid::Uuid::new_v4().to_string();
 
     if clean_content.trim().is_empty() || clean_author.trim().is_empty() {
-        return (StatusCode::BAD_REQUEST, Html("<p style=\"color: red;\">Author name and comment cannot be empty.</p>".to_string())).into_response();
+        return (
+            StatusCode::BAD_REQUEST, 
+            Html("<p style=\"color: red;\">Author name and comment cannot be empty.</p>".to_string())
+        ).into_response();
     }
 
-    // 🌟 FIX: Insert parent_id into database
+    // 🌟 NEW: Check if the submitter is the Admin
+    let admin_email = std::env::var("ADMIN_EMAIL").unwrap_or_default();
+    let is_admin = match &payload.author_email {
+        Some(email) if !email.trim().is_empty() && !admin_email.is_empty() => {
+            email.trim().eq_ignore_ascii_case(&admin_email)
+        }
+        _ => false,
+    };
+
+    // SQLite uses 1 for true and 0 for false
+    let is_approved_db = if is_admin { 1 } else { 0 };
+
+    // 🌟 FIX: Pass is_approved_db to the query instead of hardcoding 0
     let res = sqlx::query!(
-        "INSERT INTO comments (id, post_slug, author_name, author_email, content, is_approved, parent_id) VALUES (?, ?, ?, ?, ?, 0, ?)",
-        id, payload.post_slug, clean_author, payload.author_email, clean_content, payload.parent_id
+        "INSERT INTO comments (id, post_slug, author_name, author_email, content, is_approved, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        id, 
+        payload.post_slug, 
+        clean_author, 
+        payload.author_email, 
+        clean_content, 
+        is_approved_db, 
+        payload.parent_id
     )
     .execute(&pool)
     .await;
@@ -88,17 +110,40 @@ pub async fn post_comment(
     match res {
         Ok(_) => {
             let created_comment = Comment {
-                id, post_slug: payload.post_slug, author_name: clean_author, author_email: payload.author_email,
-                content: clean_content, is_approved: false, created_at: chrono::Utc::now().naive_utc(),
-                parent_id: payload.parent_id, // 🌟 Save to struct
+                id, 
+                post_slug: payload.post_slug, 
+                author_name: clean_author, 
+                author_email: payload.author_email,
+                content: clean_content, 
+                is_approved: is_admin, // 🌟 Save state to the struct
+                created_at: chrono::Utc::now().naive_utc(),
+                parent_id: payload.parent_id,
             };
             
-            let comment_clone = created_comment.clone();
-            tokio::spawn(async move { crate::mailer::send_new_comment_alert(&comment_clone).await; });
+            // Only send an email alert if someone ELSE left a comment
+            if !is_admin {
+                let comment_clone = created_comment.clone();
+                tokio::spawn(async move { 
+                    crate::mailer::send_new_comment_alert(&comment_clone).await; 
+                });
+            }
             
-            (StatusCode::CREATED, Html("<div class=\"comment-success-msg\">Thank you! Your comment has been submitted and is awaiting moderation.</div>".to_string())).into_response()
+            // 🌟 NEW: Provide a different success message based on approval status
+            let success_msg = if is_admin {
+                "<div class=\"comment-success-msg\">Welcome back, Admin! Your comment has been posted instantly.</div>".to_string()
+            } else {
+                "<div class=\"comment-success-msg\">Thank you! Your comment has been submitted and is awaiting moderation.</div>".to_string()
+            };
+
+            (StatusCode::CREATED, Html(success_msg)).into_response()
         }
-        Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, Html("<p style=\"color: red;\">Failed to save comment.</p>".to_string())).into_response(),
+        Err(e) => {
+            tracing::error!("Failed to save comment: {}", e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR, 
+                Html("<p style=\"color: red;\">Failed to save comment.</p>".to_string())
+            ).into_response()
+        }
     }
 }
 
@@ -315,11 +360,18 @@ fn render_admin_row(c: &Comment) -> String {
         "<span class=\"inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-950 text-amber-400 border border-amber-800\">Pending</span>"
     };
 
+    // 🌟 NEW: Check if the comment has a parent_id to label it as a Reply or Top-Level
+    let type_badge = if c.parent_id.is_some() {
+        "<span class=\"ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-indigo-950 text-indigo-400 border border-indigo-800\">Reply</span>"
+    } else {
+        "<span class=\"ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700\">Top-Level</span>"
+    };
+
     let toggle_label = if c.is_approved { "Unapprove" } else { "Approve" };
 
     format!(
         "<tr id=\"comment-row-{id}\" class=\"hover:bg-neutral-800/40 transition-colors\">\
-            <td class=\"px-4 py-3\">{badge}</td>\
+            <td class=\"px-4 py-3 whitespace-nowrap\">{badge}{type_badge}</td>\
             <td class=\"px-4 py-3 font-mono text-xs text-neutral-300\">{slug}</td>\
             <td class=\"px-4 py-3\">\
                 <div class=\"font-bold text-neutral-200\">{author}</div>\
@@ -332,9 +384,15 @@ fn render_admin_row(c: &Comment) -> String {
                 <button hx-delete=\"/admin/api/comments/{id}\" hx-target=\"#comment-row-{id}\" hx-swap=\"outerHTML\" hx-confirm=\"Are you sure you want to permanently delete this comment?\" class=\"px-2.5 py-1 text-xs font-semibold bg-rose-950 hover:bg-rose-900 text-rose-300 rounded border border-rose-800 transition-colors\">Delete</button>\
             </td>\
         </tr>",
-        id = c.id, badge = status_badge, slug = c.post_slug, author = c.author_name,
-        email = c.author_email.as_deref().unwrap_or("-"), content = c.content,
-        date = c.created_at.format("%Y-%m-%d %H:%M"), toggle = toggle_label
+        id = c.id, 
+        badge = status_badge, 
+        type_badge = type_badge, // 🌟 INJECTED: Added the new badge variable here
+        slug = c.post_slug, 
+        author = c.author_name,
+        email = c.author_email.as_deref().unwrap_or("-"), 
+        content = c.content,
+        date = c.created_at.format("%Y-%m-%d %H:%M"), 
+        toggle = toggle_label
     )
 }
 
@@ -464,8 +522,11 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
                         <label class="mr-label">Comment *</label>
                         <textarea id="mr-content" rows="3" required class="mr-input" placeholder="Write a comment..."></textarea>
                     </div>
-                    <div id="mr-status" style="margin-bottom: 1rem;"></div>
-                    <button type="submit" class="mr-btn" id="mr-submit">Post Comment</button>
+                    <!-- 🌟 FIX: Wrapped in a flex container to push the button right -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
+                        <div id="mr-status"></div>
+                        <button type="submit" class="mr-btn" id="mr-submit">Post Comment</button>
+                    </div>
                 </form>
             </div>
 
