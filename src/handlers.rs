@@ -6,7 +6,6 @@ use axum::{
     Form,
 };
 use sqlx::SqlitePool;
-use uuid::Uuid;
 
 // 🌟 NEW: Import LoginForm
 use crate::models::{Comment, CommentQuery, CreateCommentForm, LoginForm};
