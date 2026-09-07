@@ -11,6 +11,7 @@ pub struct Comment {
     pub content: String,
     pub is_approved: bool,
     pub created_at: NaiveDateTime,
+    pub parent_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -20,6 +21,7 @@ pub struct CreateCommentForm {
     pub author_email: Option<String>,
     pub content: String,
     pub honeypot: Option<String>, // Spam trap
+    pub parent_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
