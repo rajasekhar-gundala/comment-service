@@ -58,7 +58,7 @@ Once your backend is up and running, adding comments to your site is as simple a
 
 ```html
 <!-- The data-slug attribute groups comments for specific pages or blog posts -->
-<div id="markreply-comments" data-slug="my-first-post"></div>
-<script src="http://localhost:3000/widget.js"></script>
+<div id="markreply-comments"></div>
+<script src="http://localhost:3000/widget.js" async></script>
 
 ```
