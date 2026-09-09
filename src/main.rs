@@ -15,8 +15,9 @@ mod models;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt::init();
 
-    let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:comments.db?mode=rwc".to_string());
-    
+    let db_url =
+        std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite:comments.db?mode=rwc".to_string());
+
     let pool = SqlitePoolOptions::new()
         .max_connections(10)
         .connect(&db_url)
@@ -32,7 +33,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let admin_routes = Router::new()
         .route("/admin", get(handlers::admin_dashboard))
         .route("/admin/api/comments", get(handlers::list_admin_comments))
-        .route("/admin/api/comments/:id/toggle", post(handlers::toggle_approve_comment))
+        .route(
+            "/admin/api/comments/:id/toggle",
+            post(handlers::toggle_approve_comment),
+        )
         .route("/admin/api/comments/:id", delete(handlers::delete_comment))
         .route_layer(middleware::from_fn(handlers::require_admin_auth));
 
@@ -54,7 +58,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
     tracing::info!("Comment service running on {}", addr);
-    
+
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
 

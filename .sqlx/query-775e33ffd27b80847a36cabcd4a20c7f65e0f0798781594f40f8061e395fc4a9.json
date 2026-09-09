@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE comments SET is_approved = NOT is_approved WHERE id = ?",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "775e33ffd27b80847a36cabcd4a20c7f65e0f0798781594f40f8061e395fc4a9"
+}

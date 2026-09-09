@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT id, post_slug, author_name, author_email, content, is_approved, created_at, parent_id FROM comments WHERE post_slug = ? AND is_approved = 1 ORDER BY created_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "post_slug",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "author_name",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "author_email",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "content",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "is_approved",
+        "ordinal": 5,
+        "type_info": "Bool"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 6,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "parent_id",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "95529eb52415242c9dec3ab61f760a211cea934734781560e03ef5bf5c1a4bf3"
+}
