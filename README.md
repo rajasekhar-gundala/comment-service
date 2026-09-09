@@ -23,6 +23,7 @@ services:
     image: ghcr.io/rajasekhar-gundala/markreply:latest
     build: .
     container_name: markreply
+	restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
@@ -30,7 +31,6 @@ services:
       - ADMIN_TOKEN=your-super-secret-admin-key
     volumes:
       - ./data:/app/data
-    restart: unless-stopped
 
 ```
 
