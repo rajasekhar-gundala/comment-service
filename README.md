@@ -56,9 +56,13 @@ docker run -d \
 
 Once your backend is up and running, adding comments to your site is as simple as injecting the widget. Place this snippet exactly where you want the discussion thread to appear on your page:
 
+<div class="callout callout-info">
+  <p>Replace comments.example.com with your real domain name.</p>
+</div>
+
 ```html
 <!-- The data-slug attribute groups comments for specific pages or blog posts -->
 <div id="markreply-comments"></div>
-<script src="http://localhost:3000/widget.js" async></script>
+<script src="http://comments.example.com" async></script>
 
 ```
