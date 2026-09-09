@@ -192,6 +192,7 @@ fn render_comment_item(c: &Comment, is_reply: bool) -> String {
 -------------------------------------------------------- */
 
 // 🌟 UPDATED: Redirects to /admin/login instead of throwing a blank 401 error
+#[allow(clippy::result_large_err)]
 pub async fn require_admin_auth(req: Request, next: Next) -> Result<Response, Response> {
     let expected_token =
         std::env::var("ADMIN_TOKEN").unwrap_or_else(|_| "secret-admin-key".to_string());
