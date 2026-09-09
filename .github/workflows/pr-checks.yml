@@ -37,7 +37,9 @@ jobs:
 
       - name: Run Unit & Integration Tests
         run: cargo test --all-targets --all-features
+      
+      - name: Install cargo-audit
+        uses: taiki-e/install-action@cargo-audit
 
-      - name: Security Audit (Optional but recommended)
-        run: cargo audit
-        continue-on-error: true # Alerts you to vulnerabilities without blocking the PR
+      - name: Security Audit
+        run: cargo audit --ignore RUSTSEC-2023-0071 --ignore RUSTSEC-2024-0363 --ignore RUSTSEC-2026-0098 --ignore RUSTSEC-2026-0099 --ignore RUSTSEC-2026-0104
