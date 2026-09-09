@@ -1,7 +1,8 @@
-use lettre::{
-    message::header::ContentType, transport::smtp::authentication::Credentials, AsyncTransport, Message,
-};
 use crate::models::Comment;
+use lettre::{
+    message::header::ContentType, transport::smtp::authentication::Credentials, AsyncTransport,
+    Message,
+};
 
 pub async fn send_new_comment_alert(comment: &Comment) {
     let smtp_host = std::env::var("SMTP_HOST").unwrap_or_default();
@@ -23,7 +24,10 @@ pub async fn send_new_comment_alert(comment: &Comment) {
         Review or approve it here: https://comments.yourdomain.com/admin",
         comment.post_slug,
         comment.author_name,
-        comment.author_email.as_deref().unwrap_or("No email provided"),
+        comment
+            .author_email
+            .as_deref()
+            .unwrap_or("No email provided"),
         comment.created_at.format("%Y-%m-%d %H:%M"),
         comment.content
     );
@@ -37,7 +41,7 @@ pub async fn send_new_comment_alert(comment: &Comment) {
         .unwrap();
 
     let creds = Credentials::new(smtp_user.clone(), smtp_pass);
-    
+
     let mailer = lettre::AsyncSmtpTransport::<lettre::Tokio1Executor>::relay(&smtp_host)
         .unwrap()
         .credentials(creds)

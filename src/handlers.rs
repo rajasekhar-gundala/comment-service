@@ -29,7 +29,10 @@ pub async fn get_comments(
     .unwrap_or_default();
 
     if comments.is_empty() {
-        return Html("<p class=\"no-comments\">No comments yet. Be the first to share your thoughts!</p>".to_string());
+        return Html(
+            "<p class=\"no-comments\">No comments yet. Be the first to share your thoughts!</p>"
+                .to_string(),
+        );
     }
 
     // 🌟 NEW: Group comments into threads
@@ -75,9 +78,12 @@ pub async fn post_comment(
 
     if clean_content.trim().is_empty() || clean_author.trim().is_empty() {
         return (
-            StatusCode::BAD_REQUEST, 
-            Html("<p style=\"color: red;\">Author name and comment cannot be empty.</p>".to_string())
-        ).into_response();
+            StatusCode::BAD_REQUEST,
+            Html(
+                "<p style=\"color: red;\">Author name and comment cannot be empty.</p>".to_string(),
+            ),
+        )
+            .into_response();
     }
 
     // 🌟 NEW: Check if the submitter is the Admin
@@ -95,12 +101,12 @@ pub async fn post_comment(
     // 🌟 FIX: Pass is_approved_db to the query instead of hardcoding 0
     let res = sqlx::query!(
         "INSERT INTO comments (id, post_slug, author_name, author_email, content, is_approved, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-        id, 
-        payload.post_slug, 
-        clean_author, 
-        payload.author_email, 
-        clean_content, 
-        is_approved_db, 
+        id,
+        payload.post_slug,
+        clean_author,
+        payload.author_email,
+        clean_content,
+        is_approved_db,
         payload.parent_id
     )
     .execute(&pool)
@@ -109,24 +115,24 @@ pub async fn post_comment(
     match res {
         Ok(_) => {
             let created_comment = Comment {
-                id, 
-                post_slug: payload.post_slug, 
-                author_name: clean_author, 
+                id,
+                post_slug: payload.post_slug,
+                author_name: clean_author,
                 author_email: payload.author_email,
-                content: clean_content, 
+                content: clean_content,
                 is_approved: is_admin, // 🌟 Save state to the struct
                 created_at: chrono::Utc::now().naive_utc(),
                 parent_id: payload.parent_id,
             };
-            
+
             // Only send an email alert if someone ELSE left a comment
             if !is_admin {
                 let comment_clone = created_comment.clone();
-                tokio::spawn(async move { 
-                    crate::mailer::send_new_comment_alert(&comment_clone).await; 
+                tokio::spawn(async move {
+                    crate::mailer::send_new_comment_alert(&comment_clone).await;
                 });
             }
-            
+
             // 🌟 NEW: Provide a different success message based on approval status
             let success_msg = if is_admin {
                 "<div class=\"comment-success-msg\">Welcome back, Admin! Your comment has been posted instantly.</div>".to_string()
@@ -139,17 +145,22 @@ pub async fn post_comment(
         Err(e) => {
             tracing::error!("Failed to save comment: {}", e);
             (
-                StatusCode::INTERNAL_SERVER_ERROR, 
-                Html("<p style=\"color: red;\">Failed to save comment.</p>".to_string())
-            ).into_response()
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Html("<p style=\"color: red;\">Failed to save comment.</p>".to_string()),
+            )
+                .into_response()
         }
     }
 }
 
 // 🌟 FIX: Updated renderer to handle nesting and reply buttons
 fn render_comment_item(c: &Comment, is_reply: bool) -> String {
-    let wrapper_class = if is_reply { "comment-item comment-reply" } else { "comment-item" };
-    
+    let wrapper_class = if is_reply {
+        "comment-item comment-reply"
+    } else {
+        "comment-item"
+    };
+
     // Only allow replying to top-level comments to keep threads clean
     let reply_btn = if !is_reply {
         format!("<button type=\"button\" class=\"mr-reply-btn\" onclick=\"window.mrReplyTo('{}')\">↳ Reply</button>", c.id)
@@ -182,17 +193,32 @@ fn render_comment_item(c: &Comment, is_reply: bool) -> String {
 
 // 🌟 UPDATED: Redirects to /admin/login instead of throwing a blank 401 error
 pub async fn require_admin_auth(req: Request, next: Next) -> Result<Response, Response> {
-    let expected_token = std::env::var("ADMIN_TOKEN").unwrap_or_else(|_| "secret-admin-key".to_string());
-    
-    let auth_header = req.headers().get(header::AUTHORIZATION).and_then(|val| val.to_str().ok()).map(|val| val.trim_start_matches("Bearer ").to_string());
-    let cookie_token = req.headers().get(header::COOKIE).and_then(|val| val.to_str().ok()).and_then(|cookie_str| {
-        cookie_str.split(';').find_map(|c| {
-            let mut parts = c.trim().split('=');
-            if parts.next()? == "admin_token" { Some(parts.next()?.to_string()) } else { None }
-        })
-    });
+    let expected_token =
+        std::env::var("ADMIN_TOKEN").unwrap_or_else(|_| "secret-admin-key".to_string());
 
-    if auth_header.as_deref() == Some(&expected_token) || cookie_token.as_deref() == Some(&expected_token) {
+    let auth_header = req
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|val| val.to_str().ok())
+        .map(|val| val.trim_start_matches("Bearer ").to_string());
+    let cookie_token = req
+        .headers()
+        .get(header::COOKIE)
+        .and_then(|val| val.to_str().ok())
+        .and_then(|cookie_str| {
+            cookie_str.split(';').find_map(|c| {
+                let mut parts = c.trim().split('=');
+                if parts.next()? == "admin_token" {
+                    Some(parts.next()?.to_string())
+                } else {
+                    None
+                }
+            })
+        });
+
+    if auth_header.as_deref() == Some(&expected_token)
+        || cookie_token.as_deref() == Some(&expected_token)
+    {
         Ok(next.run(req).await)
     } else {
         // Redirect unauthorized users
@@ -208,10 +234,20 @@ pub async fn admin_login_form() -> impl IntoResponse {
 // 🌟 FIX 1: Added .into_response() to the else block
 pub async fn admin_login_submit(Form(payload): Form<LoginForm>) -> impl IntoResponse {
     let expected = std::env::var("ADMIN_TOKEN").unwrap_or_else(|_| "secret-admin-key".to_string());
-    
+
     if payload.token == expected {
-        let cookie = format!("admin_token={}; Path=/; HttpOnly; Max-Age=31536000", payload.token);
-        (StatusCode::SEE_OTHER, [(header::SET_COOKIE, cookie), (header::LOCATION, "/admin".to_string())]).into_response()
+        let cookie = format!(
+            "admin_token={}; Path=/; HttpOnly; Max-Age=31536000",
+            payload.token
+        );
+        (
+            StatusCode::SEE_OTHER,
+            [
+                (header::SET_COOKIE, cookie),
+                (header::LOCATION, "/admin".to_string()),
+            ],
+        )
+            .into_response()
     } else {
         Html(render_login_page(Some("Invalid Token. Please try again."))).into_response()
     }
@@ -220,7 +256,14 @@ pub async fn admin_login_submit(Form(payload): Form<LoginForm>) -> impl IntoResp
 // 🌟 FIX 2: Removed .to_string() from the location header
 pub async fn admin_logout() -> impl IntoResponse {
     let cookie = "admin_token=; Path=/; HttpOnly; Max-Age=0"; // Kills the cookie
-    (StatusCode::SEE_OTHER, [(header::SET_COOKIE, cookie), (header::LOCATION, "/admin/login")]).into_response()
+    (
+        StatusCode::SEE_OTHER,
+        [
+            (header::SET_COOKIE, cookie),
+            (header::LOCATION, "/admin/login"),
+        ],
+    )
+        .into_response()
 }
 
 fn render_login_page(error: Option<&str>) -> String {
@@ -333,23 +376,36 @@ pub async fn list_admin_comments(State(pool): State<SqlitePool>) -> impl IntoRes
     Html(rows)
 }
 
-pub async fn toggle_approve_comment(State(pool): State<SqlitePool>, Path(id): Path<String>) -> impl IntoResponse {
-    let _ = sqlx::query!("UPDATE comments SET is_approved = NOT is_approved WHERE id = ?", id).execute(&pool).await;
-    
+pub async fn toggle_approve_comment(
+    State(pool): State<SqlitePool>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let _ = sqlx::query!(
+        "UPDATE comments SET is_approved = NOT is_approved WHERE id = ?",
+        id
+    )
+    .execute(&pool)
+    .await;
+
     // 🌟 FIX: Explicitly select all columns including parent_id instead of using SELECT *
     if let Ok(comment) = sqlx::query_as!(
-        Comment, 
-        "SELECT id, post_slug, author_name, author_email, content, is_approved, created_at, parent_id FROM comments WHERE id = ?", 
+        Comment,
+        "SELECT id, post_slug, author_name, author_email, content, is_approved, created_at, parent_id FROM comments WHERE id = ?",
         id
     ).fetch_one(&pool).await {
         Html(render_admin_row(&comment))
-    } else { 
-        Html("".to_string()) 
+    } else {
+        Html("".to_string())
     }
 }
 
-pub async fn delete_comment(State(pool): State<SqlitePool>, Path(id): Path<String>) -> impl IntoResponse {
-    let _ = sqlx::query!("DELETE FROM comments WHERE id = ?", id).execute(&pool).await;
+pub async fn delete_comment(
+    State(pool): State<SqlitePool>,
+    Path(id): Path<String>,
+) -> impl IntoResponse {
+    let _ = sqlx::query!("DELETE FROM comments WHERE id = ?", id)
+        .execute(&pool)
+        .await;
     Html("".to_string())
 }
 
@@ -366,7 +422,11 @@ fn render_admin_row(c: &Comment) -> String {
         "<span class=\"inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-400 border border-slate-700\">Top-Level</span>"
     };
 
-    let toggle_label = if c.is_approved { "Unapprove" } else { "Approve" };
+    let toggle_label = if c.is_approved {
+        "Unapprove"
+    } else {
+        "Approve"
+    };
 
     format!(
         "<tr id=\"comment-row-{id}\" class=\"hover:bg-neutral-800/40 transition-colors\">\
@@ -391,14 +451,14 @@ fn render_admin_row(c: &Comment) -> String {
                 <button hx-delete=\"/admin/api/comments/{id}\" hx-target=\"#comment-row-{id}\" hx-swap=\"outerHTML\" hx-confirm=\"Are you sure you want to permanently delete this comment?\" class=\"px-2.5 py-1 text-xs font-semibold bg-rose-950 hover:bg-rose-900 text-rose-300 rounded border border-rose-800 transition-colors\">Delete</button>\
             </td>\
         </tr>",
-        id = c.id, 
-        badge = status_badge, 
+        id = c.id,
+        badge = status_badge,
         type_badge = type_badge,
-        slug = c.post_slug, 
+        slug = c.post_slug,
         author = c.author_name,
-        email = c.author_email.as_deref().unwrap_or("-"), 
+        email = c.author_email.as_deref().unwrap_or("-"),
         content = c.content,
-        date = c.created_at.format("%Y-%m-%d %H:%M"), 
+        date = c.created_at.format("%Y-%m-%d %H:%M"),
         toggle = toggle_label
     )
 }
@@ -406,13 +466,13 @@ fn render_admin_row(c: &Comment) -> String {
 pub async fn serve_css() -> impl axum::response::IntoResponse {
     let css = r###"
     /* 🌟 Base Variables (Light Mode) */
-    :root { 
-        --mr-primary: #059669; 
-        --mr-bg: #ffffff; 
+    :root {
+        --mr-primary: #059669;
+        --mr-bg: #ffffff;
         --mr-input-bg: #f9fafb;
-        --mr-border: #e5e7eb; 
-        --mr-text: #171717; 
-        --mr-muted: #737373; 
+        --mr-border: #e5e7eb;
+        --mr-text: #171717;
+        --mr-muted: #737373;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -441,45 +501,50 @@ pub async fn serve_css() -> impl axum::response::IntoResponse {
     /* Widget Styles */
     .mr-container { font-family: system-ui, sans-serif; color: var(--mr-text); margin-top: 3rem; padding-top: 2rem; border-top: 1px solid var(--mr-border); }
     .mr-title { font-size: 1.5rem; font-weight: bold; margin-bottom: 1.5rem; color: var(--mr-text); }
-    
-    .mr-input { 
-        width: 100%; 
-        padding: 0.5rem 0.75rem; 
-        border: 1px solid var(--mr-border); 
-        border-radius: 0.5rem; 
-        background: var(--mr-input-bg); 
+
+    .mr-input {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        border: 1px solid var(--mr-border);
+        border-radius: 0.5rem;
+        background: var(--mr-input-bg);
         color: var(--mr-text);
-        margin-top: 0.25rem; 
-        font-family: inherit; 
+        margin-top: 0.25rem;
+        font-family: inherit;
         transition: border-color 0.2s, box-shadow 0.2s;
     }
     .mr-input::placeholder { color: var(--mr-muted); opacity: 0.7; }
     .mr-input:focus { outline: none; border-color: var(--mr-primary); box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2); }
-    
+
     .mr-label { font-size: 0.75rem; font-weight: 600; color: var(--mr-text); }
-    
+
     .mr-btn { background: var(--mr-primary); color: white; padding: 0.5rem 1.25rem; border-radius: 0.5rem; border: none; font-weight: bold; cursor: pointer; transition: opacity 0.2s; }
     .mr-btn:hover { opacity: 0.9; }
-    
+
     .mr-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }
     @media (min-width: 640px) { .mr-grid { grid-template-columns: 1fr 1fr; } }
-    
+
     .comment-item { padding: 1rem; background: var(--mr-bg); border: 1px solid var(--mr-border); border-radius: 0.5rem; margin-bottom: 1rem; color: var(--mr-text); }
     .comment-header { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
     .comment-author { font-weight: bold; color: var(--mr-text); }
     .comment-date { font-size: 0.75rem; color: var(--mr-muted); }
     .comment-content { font-size: 0.875rem; line-height: 1.5; color: var(--mr-text); }
-    
+
     .comment-success-msg { padding: 1rem; background-color: rgba(5, 150, 105, 0.1); border: 1px solid rgba(5, 150, 105, 0.3); color: var(--mr-primary); border-radius: 0.5rem; font-size: 0.875rem; font-weight: 500; }
-    
+
     /* Threading */
     .comment-reply { margin-left: 2rem; border-left: 3px solid var(--mr-border); padding-left: 1rem; border-radius: 0; border-top: none; border-right: none; border-bottom: none; background: transparent; }
     .mr-reply-btn { background: none; border: none; color: var(--mr-muted); font-size: 0.75rem; font-weight: 600; cursor: pointer; padding: 0; margin-top: 0.5rem; transition: color 0.2s; }
     .mr-reply-btn:hover { color: var(--mr-primary); }
     .mr-form-slot { margin-top: 1rem; }
     "###;
-    
-    (axum::http::StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")], css).into_response()
+
+    (
+        axum::http::StatusCode::OK,
+        [(axum::http::header::CONTENT_TYPE, "text/css; charset=utf-8")],
+        css,
+    )
+        .into_response()
 }
 
 pub async fn serve_js() -> impl axum::response::IntoResponse {
@@ -487,10 +552,10 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
 (function() {
     const scriptTag = document.currentScript;
     const backendOrigin = new URL(scriptTag ? scriptTag.src : window.location.href).origin;
-    
+
     const container = document.getElementById("markreply-comments");
     if (!container) return;
-    
+
     const postSlug = container.getAttribute("data-slug") || window.location.pathname;
 
     if (!document.querySelector(`link[href="${backendOrigin}/widget.css"]`)) {
@@ -503,14 +568,14 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
     container.innerHTML = `
         <div class="mr-container">
             <h3 class="mr-title">Discussion</h3>
-            
+
             <!-- 🌟 MOVED: The Master Slot (Form) is now ABOVE the comments list -->
             <div id="mr-master-slot" style="margin-bottom: 2rem;">
                 <form id="mr-form" style="max-width: 36rem;">
                     <input type="hidden" id="mr-slug" value="${postSlug}">
                     <input type="hidden" id="mr-parent-id" value="">
                     <input type="text" id="mr-honeypot" style="display:none" tabindex="-1" autocomplete="off">
-                    
+
                     <div id="mr-replying-to" style="display: none; font-size: 0.75rem; color: var(--mr-primary); font-weight: 600; margin-bottom: 1rem;">
                         Replying to comment... <button type="button" id="mr-cancel-reply" style="background:none;border:none;color:var(--mr-muted);cursor:pointer;text-decoration:underline;">Cancel</button>
                     </div>
@@ -578,14 +643,14 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
     formEl.addEventListener("submit", async (e) => {
         e.preventDefault();
         document.getElementById("mr-submit").disabled = true;
-        
+
         const formData = new URLSearchParams();
         formData.append("post_slug", postSlug);
         formData.append("author_name", document.getElementById("mr-name").value);
         formData.append("author_email", document.getElementById("mr-email").value);
         formData.append("content", document.getElementById("mr-content").value);
         formData.append("honeypot", document.getElementById("mr-honeypot").value);
-        
+
         if (parentInput.value) {
             formData.append("parent_id", parentInput.value);
         }
@@ -598,7 +663,7 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
                 parentInput.value = "";
                 replyIndicator.style.display = "none";
                 masterSlot.appendChild(formEl);
-                
+
                 fetchComments();
             }
         } finally {
@@ -609,5 +674,13 @@ pub async fn serve_js() -> impl axum::response::IntoResponse {
     fetchComments();
 })();
     "###;
-    (axum::http::StatusCode::OK, [(axum::http::header::CONTENT_TYPE, "application/javascript; charset=utf-8")], js).into_response()
+    (
+        axum::http::StatusCode::OK,
+        [(
+            axum::http::header::CONTENT_TYPE,
+            "application/javascript; charset=utf-8",
+        )],
+        js,
+    )
+        .into_response()
 }
