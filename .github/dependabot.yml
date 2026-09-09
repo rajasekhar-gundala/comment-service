@@ -1,0 +1,15 @@
+version: 2
+updates:
+  # Keep Rust crates updated
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+
+  # Keep GitHub Actions (like checkout and cargo-audit) updated
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
