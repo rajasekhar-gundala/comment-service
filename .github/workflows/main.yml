@@ -24,7 +24,7 @@ jobs:
     - name: Publish to Registry
       uses: elgohr/Publish-Docker-Github-Action@v5
       with:
-        name: rajasekhar-gundala/comment-service
+        name: rajasekhar-gundala/markreply
         username: ${{ github.actor }}
         password: ${{ secrets.PERSONAL_TOKEN }}
         registry: ghcr.io
