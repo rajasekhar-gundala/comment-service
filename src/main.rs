@@ -34,9 +34,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/admin", get(handlers::admin_dashboard))
         .route("/admin/api/comments", get(handlers::list_admin_comments))
         .route(
-+            "/admin/api/comments/{id}/toggle",
-+            post(handlers::toggle_approve_comment),
-+        )
+            "/admin/api/comments/{id}/toggle",
+            post(handlers::toggle_approve_comment),
+        )
         .route("/admin/api/comments/:id", delete(handlers::delete_comment))
         .route_layer(middleware::from_fn(handlers::require_admin_auth));
 
