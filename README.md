@@ -20,9 +20,9 @@ Create a `docker-compose.yml` file to manage your environment:
 ```yaml
 services:
   markreply:
-    image: markreply/core:latest
+    image: ghcr.io/rajasekhar-gundala/markreply:latest
     build: .
-    container_name: markreply-engine
+    container_name: markreply
     ports:
       - "3000:3000"
     environment:
