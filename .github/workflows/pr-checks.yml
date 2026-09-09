@@ -1,0 +1,43 @@
+name: PR Code Quality Checks
+
+on:
+  pull_request:
+    branches: [ "main" ]
+  push:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  validate:
+    name: Format, Lint, and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Set up Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: "markreply-cache"
+
+      - name: Check Formatting
+        run: cargo fmt --all -- --check
+        
+      - name: Run Clippy (Code Linter)
+        # The '-D warnings' flag forces the build to fail if Clippy finds any issues
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Run Unit & Integration Tests
+        run: cargo test --all-targets --all-features
+
+      - name: Security Audit (Optional but recommended)
+        run: cargo audit
+        continue-on-error: true # Alerts you to vulnerabilities without blocking the PR
