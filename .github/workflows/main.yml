@@ -40,7 +40,8 @@ jobs:
       with:
         target: 'http://localhost:3000'
         # Set to false initially so we can review the report without crashing the pipeline
-        fail_action: false 
+        fail_action: false
+        token: '' # 🌟 This empty string explicitly disables issue creation 
 
     - name: Push to Registry
       # Only runs if the ZAP scan above succeeds (or fail_action is false)
