@@ -47,6 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/admin/logout", get(handlers::admin_logout));
 
     let app = Router::new()
+        .route("/", get(|| async { "MarkReply API is running" }))
         .route("/widget.js", get(handlers::serve_js))
         .route("/widget.css", get(handlers::serve_css))
         .route("/api/comments", get(handlers::get_comments))
