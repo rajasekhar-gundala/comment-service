@@ -25,8 +25,11 @@ FROM debian:bookworm-slim
 
 WORKDIR /app
 
-# Install SSL certs (for Lettre/Emails) and sqlite3
-RUN apt-get update && apt-get install -y ca-certificates sqlite3 && rm -rf /var/lib/apt/lists/*
+# 🌟 CRITICAL FIX: Upgrade base OS packages first to patch Trivy CVEs (zlib, perl, sqlite3)
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y ca-certificates sqlite3 \
+    && rm -rf /var/lib/apt/lists/*
 
 # Copy the compiled binary and migrations from the builder
 COPY --from=builder /usr/src/app/target/release/comment-service ./
