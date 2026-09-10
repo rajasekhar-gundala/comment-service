@@ -1,5 +1,6 @@
 use axum::{
     middleware,
+    response::Response, // 🌟 ADDED: Required for modifying the response
     routing::{delete, get, post},
     Router,
 };
@@ -10,6 +11,19 @@ use tower_http::cors::{Any, CorsLayer};
 mod handlers;
 mod mailer;
 mod models;
+
+// 🌟 NEW: Custom middleware to inject security headers for ZAP
+async fn security_headers(mut response: Response) -> Response {
+    response.headers_mut().insert(
+        axum::http::header::X_CONTENT_TYPE_OPTIONS,
+        axum::http::HeaderValue::from_static("nosniff"),
+    );
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-store, no-cache, must-revalidate"),
+    );
+    response
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -40,7 +54,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/admin/api/comments/{id}", delete(handlers::delete_comment))
         .route_layer(middleware::from_fn(handlers::require_admin_auth));
 
-    // 🌟 NEW: Unprotected routes for login/logout
     let public_admin_routes = Router::new()
         .route("/admin/login", get(handlers::admin_login_form))
         .route("/admin/login", post(handlers::admin_login_submit))
@@ -55,6 +68,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .merge(public_admin_routes)
         .merge(admin_routes)
         .layer(cors)
+        .layer(middleware::map_response(security_headers)) // 🌟 ADDED: Apply the security headers to all routes
         .with_state(pool);
 
     let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
