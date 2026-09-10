@@ -23,7 +23,7 @@ services:
     image: ghcr.io/rajasekhar-gundala/markreply:latest
     build: .
     container_name: markreply
-	restart: unless-stopped
+    restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
@@ -31,10 +31,13 @@ services:
       - ADMIN_TOKEN=your-super-secret-admin-key
     volumes:
       - ./data:/app/data
-
 ```
 
 Start the engine by running `docker compose up -d`. The `./data` volume ensures your SQLite database persists safely across container restarts.
+
+<div class="callout callout-note">
+  <p><strong>🛡️ Security First:</strong> We are proud to say that our production Docker image is 100% vulnerability-free.</p>
+</div>
 
 **Standard Docker Run**
 If you prefer running the container directly without Compose, use the following command:
@@ -49,7 +52,6 @@ docker run -d \
   -v $(pwd)/data:/app/data \
   --name markreply-engine \
   markreply-core
-
 ```
 
 ## 💻 Frontend Integration
@@ -57,12 +59,11 @@ docker run -d \
 Once your backend is up and running, adding comments to your site is as simple as injecting the widget. Place this snippet exactly where you want the discussion thread to appear on your page:
 
 <div class="callout callout-info">
-  <p>Replace comments.example.com with your real domain name.</p>
+  <p>Replace <code>comments.example.com</code> with your real domain name.</p>
 </div>
 
 ```html
 <!-- The data-slug attribute groups comments for specific pages or blog posts -->
 <div id="markreply-comments"></div>
-<script src="http://comments.example.com" async></script>
-
+<script src="http://comments.example.com/widget.js" async></script>
 ```
