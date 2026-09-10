@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/rajasekhar-gundala/markreply/compare/v0.1.0...v0.2.0) (2026-09-10)
+
+
+### Features
+
+* trigger first v1.0.0 release ([#40](https://github.com/rajasekhar-gundala/markreply/issues/40)) ([b2542a7](https://github.com/rajasekhar-gundala/markreply/commit/b2542a741c03f2690b3716c544893d322e20deb9))
+
 ## 0.1.0 (2026-09-10)
 
 
