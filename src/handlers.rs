@@ -153,7 +153,7 @@ pub async fn post_comment(
     }
 }
 
-// 🌟 FIX: Updated renderer to handle nesting and reply buttons
+// 🌟 FIX: Updated renderer to parse Markdown and inject Admin badges
 fn render_comment_item(c: &Comment, is_reply: bool) -> String {
     let wrapper_class = if is_reply {
         "comment-item comment-reply"
@@ -161,27 +161,51 @@ fn render_comment_item(c: &Comment, is_reply: bool) -> String {
         "comment-item"
     };
 
-    // Only allow replying to top-level comments to keep threads clean
     let reply_btn = if !is_reply {
         format!("<button type=\"button\" class=\"mr-reply-btn\" onclick=\"window.mrReplyTo('{}')\">↳ Reply</button>", c.id)
     } else {
         "".to_string()
     };
 
+    // 🌟 NEW: Check if this comment belongs to the Admin
+    let admin_email = std::env::var("ADMIN_EMAIL").unwrap_or_default();
+    let is_admin = match &c.author_email {
+        Some(email) if !email.trim().is_empty() && !admin_email.is_empty() => {
+            email.trim().eq_ignore_ascii_case(&admin_email)
+        }
+        _ => false,
+    };
+
+    let admin_badge = if is_admin {
+        "<span class=\"mr-admin-badge\">Admin</span>"
+    } else {
+        ""
+    };
+
+    // 🌟 NEW: Parse the raw Markdown into HTML, then sanitize it again to be safe
+    let parser = pulldown_cmark::Parser::new(&c.content);
+    let mut html_content = String::new();
+    pulldown_cmark::html::push_html(&mut html_content, parser);
+    let safe_html = ammonia::clean(&html_content);
+
     format!(
         "<div class=\"{wrapper_class}\">\
             <div class=\"comment-header\">\
-                <span class=\"comment-author\">{name}</span>\
+                <div>\
+                    <span class=\"comment-author\">{name}</span>\
+                    {badge}\
+                </div>\
                 <span class=\"comment-date\">{date}</span>\
             </div>\
-            <p class=\"comment-content\">{content}</p>\
+            <div class=\"comment-content\">{content}</div>\
             {reply_btn}\
             <div id=\"mr-slot-{id}\" class=\"mr-form-slot\"></div>\
         </div>",
         wrapper_class = wrapper_class,
         name = c.author_name,
+        badge = admin_badge,
         date = c.created_at.format("%b %d, %Y at %H:%M"),
-        content = c.content,
+        content = safe_html, // Injected parsed HTML instead of raw text
         reply_btn = reply_btn,
         id = c.id
     )
@@ -524,6 +548,33 @@ pub async fn serve_css() -> impl axum::response::IntoResponse {
 
     .mr-grid { display: grid; grid-template-columns: 1fr; gap: 1rem; margin-bottom: 1rem; }
     @media (min-width: 640px) { .mr-grid { grid-template-columns: 1fr 1fr; } }
+
+    /* 🌟 Markdown & Admin Badge Styles */
+    .mr-admin-badge { background: var(--mr-primary); color: white; padding: 0.1rem 0.4rem; border-radius: 0.25rem; font-size: 0.65rem; margin-left: 0.5rem; vertical-align: middle; text-transform: uppercase; letter-spacing: 0.05em; }
+    
+    .comment-content p { margin-top: 0; margin-bottom: 0.75rem; line-height: 1.6; }
+    .comment-content p:last-child { margin-bottom: 0; }
+    .comment-content strong { font-weight: 700; color: var(--mr-text); }
+    .comment-content em { font-style: italic; }
+    .comment-content del { text-decoration: line-through; opacity: 0.7; }
+    
+    /* Links */
+    .comment-content a { color: var(--mr-primary); text-decoration: underline; text-underline-offset: 2px; }
+    .comment-content a:hover { opacity: 0.8; }
+    
+    /* Blockquotes */
+    .comment-content blockquote { border-left: 3px solid var(--mr-border); margin: 0.75rem 0; padding-left: 1rem; color: var(--mr-muted); font-style: italic; background: rgba(0,0,0,0.02); padding-top: 0.25rem; padding-bottom: 0.25rem; }
+    
+    /* Lists */
+    .comment-content ul, .comment-content ol { margin-top: 0.5rem; margin-bottom: 0.75rem; padding-left: 1.5rem; }
+    .comment-content ul { list-style-type: disc; }
+    .comment-content ol { list-style-type: decimal; }
+    .comment-content li { margin-bottom: 0.25rem; }
+    
+    /* Code Blocks */
+    .comment-content code { background: var(--mr-input-bg); padding: 0.1rem 0.3rem; border-radius: 0.25rem; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85em; border: 1px solid var(--mr-border); }
+    .comment-content pre { background: var(--mr-input-bg); padding: 0.75rem; border-radius: 0.5rem; overflow-x: auto; margin: 0.75rem 0; border: 1px solid var(--mr-border); }
+    .comment-content pre code { background: transparent; padding: 0; border: none; font-size: 0.85em; }
 
     .comment-item { padding: 1rem; background: var(--mr-bg); border: 1px solid var(--mr-border); border-radius: 0.5rem; margin-bottom: 1rem; color: var(--mr-text); }
     .comment-header { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
